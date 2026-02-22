@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'resources_page.dart';
 
 class DashboardPage extends StatefulWidget {
   final Function(int) onNavigate;
@@ -287,80 +288,65 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   Widget _buildSOSCenter() {
     return Column(
       children: [
-        GestureDetector(
-          onLongPress: _triggerEmergencySOS,
+        Container(
+          width: 300,
+          height: 80,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF2F2F7),
+            borderRadius: BorderRadius.circular(40),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              )
+            ],
+          ),
           child: Stack(
-            alignment: Alignment.center,
             children: [
-              // Pulse Rings
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 180 * _pulseController.value,
-                        height: 180 * _pulseController.value,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFFE71C23).withOpacity(0.1 * (1 - _pulseController.value)),
-                        ),
-                      ),
-                      Container(
-                        width: 240 * _pulseController.value,
-                        height: 240 * _pulseController.value,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFFE71C23).withOpacity(0.04 * (1 - _pulseController.value)),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-              Container(
-                width: 150,
-                height: 150,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFE71C23),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFE71C23).withOpacity(0.4),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+              const Center(
+                child: Text(
+                  "Swipe for Emergency",
+                  style: TextStyle(
+                    color: Color(0xFF8E8E93),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
                 ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.white, size: 48),
-                    SizedBox(height: 4),
-                    Text(
-                      'SOS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                      ),
+              ),
+              Dismissible(
+                key: const Key("dash_sos_swipe"),
+                direction: DismissDirection.startToEnd,
+                confirmDismiss: (direction) async {
+                  _triggerEmergencySOS();
+                  return false;
+                },
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    margin: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE71C23),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFFFF9494),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        )
+                      ],
                     ),
-                  ],
+                    child: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
                 ),
               ),
             ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'LONG PRESS TO ACTIVATE SOS',
-          style: TextStyle(
-            color: Color(0xFFE71C23),
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            letterSpacing: 1.5,
           ),
         ),
       ],
@@ -418,41 +404,81 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       crossAxisSpacing: 16,
       childAspectRatio: 1.1,
       children: [
-        _featureCard('AI Chat', 'Safe Companion', Icons.chat_bubble_rounded, const Color(0xFF5D3891), 1),
-        _featureCard('Safety Map', 'Live Navigation', Icons.map_rounded, const Color(0xFF00ADB5), 3),
+        _featureCard('AI Chat', 'Safe Companion', 'assets/images/ai_chat.png', const Color(0xFF5D3891), 1),
+        _featureCard('Community', 'Public Experience', 'assets/images/community_art.png', const Color(0xFFF9A826), 6),
+        _featureCard('Nearby Help', 'Police & Hospitals', 'assets/images/emergency_art.png', const Color(0xFF2D31FA), -1),
+        _featureCard('Safety Map', 'Live Navigation', 'assets/images/map_art_new.png', const Color(0xFF00ADB5), 3),
       ],
     );
   }
 
-  Widget _featureCard(String title, String sub, IconData icon, Color color, int index) {
+  Widget _featureCard(String title, String sub, String imagePath, Color color, int index) {
     return GestureDetector(
-      onTap: () => widget.onNavigate(index),
+      onTap: () {
+        if (index == -1) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const ResourcesPage()));
+        } else {
+          widget.onNavigate(index);
+        }
+      },
       child: Container(
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(28),
           border: Border.all(color: const Color(0xFFF2F2F7)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 6)),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            children: [
+              // Image Background
+              Positioned(
+                top: 0, left: 0, right: 0, bottom: 50,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  child: Image.asset(
+                    imagePath,
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const Spacer(),
-            Text(title, style: const TextStyle(color: Color(0xFF1F1F1F), fontSize: 16, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(sub, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
-          ],
+              // Bottom Content
+              Positioned(
+                bottom: 0, left: 0, right: 0,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.white.withOpacity(0), Colors.white],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: const [0, 0.4],
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(title, style: const TextStyle(color: Color(0xFF1F1F1F), fontSize: 15, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Container(width: 4, height: 4, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(sub, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

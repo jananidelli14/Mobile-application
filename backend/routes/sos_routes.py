@@ -31,8 +31,14 @@ def activate_sos():
         location = data.get('location')
         emergency_contacts = data.get('emergency_contacts', [])
         
+        if not user_id or not location:
+            return jsonify({'success': False, 'error': 'Missing user_id or location'}), 400
+
         # Generate unique SOS session ID
         sos_id = str(uuid.uuid4())
+        
+        # 1. Alert nearest police stations (Top 5)
+        police_stations = alert_nearest_police(location, limit=5)
         
         # Store SOS session
         active_sos_sessions[sos_id] = {
@@ -40,26 +46,21 @@ def activate_sos():
             'location': location,
             'status': 'active',
             'activated_at': datetime.now().isoformat(),
-            'emergency_contacts': emergency_contacts
+            'emergency_contacts': emergency_contacts,
+            'police_stations': police_stations
         }
         
-        # Alert nearest police station
-        police_response = alert_nearest_police(location)
+        # 2. Alert each police station via simulated SMS
+        for station in police_stations:
+            police_msg = f"EMERGENCY: User {user_id} activated SOS at {location['lat']},{location['lng']}. Dist: {station['distance_km']}km. ETA: {station['eta_minutes']}min."
+            send_sms(station['phone'], police_msg)
         
-        # Send SMS to emergency contacts
+        # 3. Send SMS to emergency contacts
         for contact in emergency_contacts:
-            message = f"EMERGENCY ALERT: Your contact has activated SOS. Location: https://maps.google.com/?q={location['lat']},{location['lng']}"
-            send_sms(contact, message)
+            contact_msg = f"🚨 EMERGENCY ALERT: Your contact has activated SOS! Location: https://maps.google.com/?q={location['lat']},{location['lng']}"
+            send_sms(contact, contact_msg)
         
-        # Send email notifications
-        if 'email' in data:
-            send_email(
-                data['email'],
-                "SOS Alert Activated",
-                f"Your SOS alert has been activated. Help is on the way. Location: {location}"
-            )
-        
-        # Save to database
+        # 4. Save to database
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -69,16 +70,21 @@ def activate_sos():
         conn.commit()
         conn.close()
         
+        # Primary police station is the first one
+        primary_police = police_stations[0] if police_stations else {}
+        
         return jsonify({
             'success': True,
             'sos_id': sos_id,
-            'message': 'SOS activated successfully',
-            'police_station': police_response,
-            'eta_minutes': police_response.get('eta_minutes', 6),
+            'message': f'SOS activated. Broadcom to {len(police_stations)} police units.',
+            'police_station': primary_police,
+            'all_police_stations': police_stations,
+            'eta_minutes': primary_police.get('eta_minutes', 5),
             'status': 'active'
         }), 200
         
     except Exception as e:
+        print(f"SOS Activation ERROR: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

@@ -29,6 +29,8 @@ class ApiService {
     required String city,
     required List<String> emergencyContacts,
     required String otp,
+    String? healthConditions,
+    bool consentAgreed = false,
   }) async {
     try {
       final response = await http.post(
@@ -41,6 +43,8 @@ class ApiService {
           'city': city,
           'emergency_contacts': emergencyContacts,
           'otp': otp,
+          'health_conditions': healthConditions,
+          'consent_agreed': consentAgreed ? 1 : 0,
         }),
       );
       return jsonDecode(response.body);
@@ -112,6 +116,8 @@ class ApiService {
     required String message,
     String? conversationId,
     Map<String, double>? location,
+    String? imageBase64,
+    String? voiceBase64,
   }) async {
     try {
       final response = await http.post(
@@ -122,6 +128,34 @@ class ApiService {
           'message': message,
           if (conversationId != null) 'conversation_id': conversationId,
           if (location != null) 'user_location': location,
+          if (imageBase64 != null) 'image': imageBase64,
+          if (voiceBase64 != null) 'voice': voiceBase64,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // ─── Reporting ─────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> submitReport({
+    required String userId,
+    required String type,
+    required String description,
+    required double lat,
+    required double lng,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/report/submit'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user_id': userId,
+          'type': type,
+          'description': description,
+          'location': {'lat': lat, 'lng': lng},
         }),
       );
       return jsonDecode(response.body);

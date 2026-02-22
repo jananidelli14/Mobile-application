@@ -37,12 +37,24 @@ class _ChatPageState extends State<ChatPage> {
     if (mounted) setState(() => _pos = pos);
   }
 
+  String? _selectedImageBase64;
+  String? _selectedVoiceBase64;
+
   void _sendMessage() async {
-    if (_controller.text.trim().isEmpty || _isLoading) return;
+    if ((_controller.text.trim().isEmpty && _selectedImageBase64 == null && _selectedVoiceBase64 == null) || _isLoading) return;
     final userMsg = _controller.text.trim();
+    final image = _selectedImageBase64;
+    final voice = _selectedVoiceBase64;
+
     setState(() {
-      _messages.add({'role': 'user', 'text': userMsg});
+      _messages.add({
+        'role': 'user', 
+        'text': voice != null ? "🎤 Voice Message: $userMsg" : (image != null ? "📸 Image Message: $userMsg" : userMsg),
+        'hasImage': image != null,
+      });
       _isLoading = true;
+      _selectedImageBase64 = null;
+      _selectedVoiceBase64 = null;
     });
     _controller.clear();
     _scrollToBottom();
@@ -52,8 +64,10 @@ class _ChatPageState extends State<ChatPage> {
       message: userMsg,
       conversationId: _conversationId,
       location: _pos != null ? {'lat': _pos!.latitude, 'lng': _pos!.longitude} : null,
+      imageBase64: image,
+      voiceBase64: voice,
     );
-
+/* ... rest of the method logic unchanged ... */
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -67,6 +81,20 @@ class _ChatPageState extends State<ChatPage> {
       });
       _scrollToBottom();
     }
+  }
+
+  void _mockImageSelection() {
+    setState(() {
+      _selectedImageBase64 = "base64_image_data";
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("📸 Image attached (Mocked)")));
+    });
+  }
+
+  void _mockVoiceRecording() {
+    setState(() {
+      _selectedVoiceBase64 = "base64_voice_data";
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🎤 Voice recorded (Mocked)")));
+    });
   }
 
   void _scrollToBottom() {
@@ -158,14 +186,30 @@ class _ChatPageState extends State<ChatPage> {
             bottomRight: Radius.circular(isUser ? 4 : 20),
           ),
         ),
-        child: Text(
-          msg['text'] as String,
-          style: TextStyle(
-            color: isUser ? Colors.white : const Color(0xFF1F1F1F),
-            height: 1.4,
-            fontSize: 15,
-            fontWeight: isUser ? FontWeight.w500 : FontWeight.w400,
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (msg['hasImage'] == true) ...[
+               Container(
+                 height: 150, width: double.infinity,
+                 margin: const EdgeInsets.only(bottom: 8),
+                 decoration: BoxDecoration(
+                   color: Colors.black12,
+                   borderRadius: BorderRadius.circular(12),
+                 ),
+                 child: const Center(child: Icon(Icons.image_rounded, color: Colors.white70, size: 40)),
+               ),
+            ],
+            Text(
+              msg['text'] as String,
+              style: TextStyle(
+                color: isUser ? Colors.white : const Color(0xFF1F1F1F),
+                height: 1.4,
+                fontSize: 15,
+                fontWeight: isUser ? FontWeight.w500 : FontWeight.w400,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -201,23 +245,33 @@ class _ChatPageState extends State<ChatPage> {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       decoration: const BoxDecoration(
         color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, -1))],
       ),
       child: Row(
         children: [
+          IconButton(
+            onPressed: _mockImageSelection,
+            icon: Icon(Icons.camera_alt_rounded, color: _selectedImageBase64 != null ? const Color(0xFF00ADB5) : const Color(0xFF8E8E93)),
+          ),
+          IconButton(
+            onPressed: _mockVoiceRecording,
+            icon: Icon(Icons.mic_rounded, color: _selectedVoiceBase64 != null ? const Color(0xFFE71C23) : const Color(0xFF8E8E93)),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xFFF2F2F7),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(24),
               ),
               child: TextField(
                 controller: _controller,
                 style: const TextStyle(color: Color(0xFF1F1F1F), fontSize: 15),
                 decoration: const InputDecoration(
-                  hintText: "How can I help you?",
-                  hintStyle: TextStyle(color: Color(0xFF8E8E93), fontSize: 15),
+                  hintText: "Type or use voice/image...",
+                  hintStyle: TextStyle(color: Color(0xFF8E8E93), fontSize: 14),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
                 onSubmitted: (_) => _sendMessage(),
               ),
@@ -227,12 +281,12 @@ class _ChatPageState extends State<ChatPage> {
           GestureDetector(
             onTap: _sendMessage,
             child: Container(
-              width: 48, height: 48,
+              width: 44, height: 44,
               decoration: const BoxDecoration(
                 color: Color(0xFF5D3891),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 24),
+              child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
             ),
           ),
         ],

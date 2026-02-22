@@ -7,30 +7,33 @@ from database.db import get_db_connection
 from services.mapillary_service import search_pois_overpass
 from services.location_service import get_nearest_locations, estimate_travel_time
 
-def alert_nearest_police(location):
+def alert_nearest_police(location, limit=5):
     """
-    Alert nearest police station about emergency using live OSM data
+    Identify top N nearest police stations about emergency using live OSM data
     
     Args:
         location: Dict with 'lat' and 'lng'
+        limit: Number of stations to return
     
     Returns:
-        dict: Nearest police station info with ETA
+        list: List of nearest police station info with ETA
     """
     try:
         lat = location['lat']
         lng = location['lng']
         
         # 1. Try Live OSM data first (Real-time!)
-        # Search radius 10km
-        stations = search_pois_overpass(lat, lng, 'police', 10000)
+        # Search radius 20km (increased for better coverage)
+        stations = search_pois_overpass(lat, lng, 'police', 20000)
         
-        nearest = None
+        results = []
         if stations:
-            nearest = stations[0]
-            nearest['source'] = 'OpenStreetMap'
-        else:
-            # 2. Fallback to local database if OSM fails or is empty
+            for s in stations[:limit]:
+                s['source'] = 'OpenStreetMap'
+                results.append(s)
+        
+        # 2. Fill from fallback database if needed
+        if len(results) < limit:
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM police_stations")
@@ -39,50 +42,58 @@ def alert_nearest_police(location):
             
             if all_stations:
                 stations_list = [dict(station) for station in all_stations]
-                nearest_list = get_nearest_locations(lat, lng, stations_list, limit=1)
-                if nearest_list:
-                    nearest = nearest_list[0]
+                # Filter out those already found via OSM to avoid duplicates
+                found_ids = [s.get('id') for s in results]
+                remaining_stations = [s for s in stations_list if s.get('id') not in found_ids]
+                
+                nearest_list = get_nearest_locations(lat, lng, remaining_stations, limit=limit-len(results))
+                for n in nearest_list:
                     # Map 'latitude'/'longitude' to 'lat'/'lng' for consistency
-                    nearest['lat'] = nearest['latitude']
-                    nearest['lng'] = nearest['longitude']
-                    nearest['source'] = 'Local Database'
+                    n['lat'] = n['latitude']
+                    n['lng'] = n['longitude']
+                    n['source'] = 'Local Database'
+                    results.append(n)
 
-        if nearest:
+        processed_results = []
+        for station in results:
             # Calculate more professional ETA
-            # Base dispatch time (min 2 mins) + travel time
-            travel_mins = estimate_travel_time(nearest['distance_km'], mode='driving')
+            travel_mins = estimate_travel_time(station['distance_km'], mode='driving')
             dispatch_time = 2
             total_eta = travel_mins + dispatch_time
-            
-            # Ensure a realistic minimum for "help arrived in X min"
             total_eta = max(total_eta, 3) 
             
-            return {
-                'name': nearest['name'],
-                'address': nearest.get('address', 'Location broadcast to nearest unit'),
-                'phone': nearest.get('phone', '100'),
-                'distance_km': nearest['distance_km'],
+            processed_results.append({
+                'id': station.get('id'),
+                'name': station['name'],
+                'address': station.get('address', 'Location broadcast to nearest unit'),
+                'phone': station.get('phone') or station.get('emergency_phone') or '100',
+                'lat': station['lat'],
+                'lng': station['lng'],
+                'distance_km': station['distance_km'],
                 'eta_minutes': total_eta,
-                'source': nearest.get('source', 'Emergency Services')
-            }
-        
-        # 3. Final fallback
-        return {
-            'name': 'Emergency Dispatch Control',
-            'phone': '112',
-            'distance_km': 0,
-            'eta_minutes': 5,
-            'source': 'National Helpline'
-        }
+                'source': station.get('source', 'Emergency Services')
+            })
+            
+        if not processed_results:
+            # 3. Final fallback
+            processed_results.append({
+                'name': 'Emergency Dispatch Control',
+                'phone': '112',
+                'distance_km': 0,
+                'eta_minutes': 5,
+                'source': 'National Helpline'
+            })
+            
+        return processed_results
             
     except Exception as e:
         print(f"Error alerting police: {e}")
-        return {
+        return [{
             'name': 'Emergency Services',
             'phone': '100',
             'eta_minutes': 6,
             'source': 'System Fallback'
-        }
+        }]
 
 def get_police_station_by_district(district):
     """Get police stations in a specific district"""

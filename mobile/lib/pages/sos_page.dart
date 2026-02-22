@@ -19,6 +19,8 @@ class _SOSPageState extends State<SOSPage> with TickerProviderStateMixin {
   Map<String, dynamic>? _sosResponse;
   int _countdown = 5;
   Timer? _timer;
+  int _etaSeconds = 1800; // 30 mins
+  Timer? _etaTimer;
   Position? _currentPosition;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
@@ -67,14 +69,33 @@ class _SOSPageState extends State<SOSPage> with TickerProviderStateMixin {
           _isTriggered = true; 
           _isActivating = false;
           _sosResponse = res;
+          _startEtaTimer();
         });
       }
     }
   }
 
+  void _startEtaTimer() {
+    _etaTimer?.cancel();
+    _etaTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_etaSeconds > 0) {
+        setState(() => _etaSeconds--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  String _formatTime(int seconds) {
+    int m = seconds ~/ 60;
+    int s = seconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
+    _etaTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -138,37 +159,80 @@ class _SOSPageState extends State<SOSPage> with TickerProviderStateMixin {
   }
 
   Widget _buildMainSOSButton() {
-    return AnimatedBuilder(
-      animation: _pulseAnim,
-      builder: (ctx, _) => Transform.scale(
-        scale: _pulseAnim.value,
-        child: GestureDetector(
-          onLongPress: _startCountdown,
-          child: Container(
-            width: 220, height: 220,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFFE71C23),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFE71C23).withOpacity(0.3),
-                  blurRadius: 40,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 60),
-                SizedBox(height: 8),
-                Text("SOS", style: TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: 2)),
-                Text("LONG PRESS", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
-            ),
+    return Column(
+      children: [
+        const Text(
+          "SWIPE FOR EMERGENCY",
+          style: TextStyle(
+            color: Color(0xFFE71C23),
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
           ),
         ),
-      ),
+        const SizedBox(height: 24),
+        Container(
+          width: 300,
+          height: 80,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF2F2F7),
+            borderRadius: BorderRadius.circular(40),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              )
+            ],
+          ),
+          child: Stack(
+            children: [
+              const Center(
+                child: Text(
+                  "Slide to Call Help",
+                  style: TextStyle(
+                    color: Color(0xFF8E8E93),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              Dismissible(
+                key: const Key("sos_swipe"),
+                direction: DismissDirection.startToEnd,
+                confirmDismiss: (direction) async {
+                  _activateSOS(); // Direct activation for swipe
+                  return false;
+                },
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    margin: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE71C23),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFFFF9494),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        )
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -256,8 +320,65 @@ class _SOSPageState extends State<SOSPage> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 32),
               const Text("Alert Sent!", style: TextStyle(color: Color(0xFF1F1F1F), fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-              const SizedBox(height: 16),
-              if (_sosResponse?['police_station'] != null) ...[
+              const SizedBox(height: 12),
+              _buildTrackingCard(),
+              const SizedBox(height: 24),
+              if (_sosResponse?['all_police_stations'] != null) ...[
+                const Text(
+                  "UNITS DISPATCHED",
+                  style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: (_sosResponse!['all_police_stations'] as List).length,
+                    separatorBuilder: (ctx, _) => const SizedBox(width: 12),
+                    itemBuilder: (ctx, i) {
+                      final station = _sosResponse!['all_police_stations'][i];
+                      return Container(
+                        width: 160,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF2F2F7),
+                          borderRadius: BorderRadius.circular(16),
+                          border: i == 0 ? Border.all(color: const Color(0xFFE71C23), width: 1.5) : null,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.local_police_rounded, color: i == 0 ? const Color(0xFFE71C23) : const Color(0xFF5D3891), size: 16),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    station['name'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Spacer(),
+                            Text(
+                              "${station['distance_km']}km • ${station['eta_minutes']}min",
+                              style: TextStyle(
+                                color: i == 0 ? const Color(0xFFE71C23) : const Color(0xFF666666),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ] else if (_sosResponse?['police_station'] != null) ...[
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -309,6 +430,63 @@ class _SOSPageState extends State<SOSPage> with TickerProviderStateMixin {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTrackingCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F2F7),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFF5D3891).withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48, height: 48,
+                decoration: const BoxDecoration(color: Color(0xFF5D3891), shape: BoxShape.circle),
+                child: const Icon(Icons.local_police_rounded, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Help is on the way", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF1F1F1F))),
+                    Text("Top 5 police units notified", style: TextStyle(color: const Color(0xFF5D3891), fontWeight: FontWeight.w700, fontSize: 12)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text("ETA", style: TextStyle(color: Color(0xFF8E8E93), fontSize: 10, fontWeight: FontWeight.w800)),
+                  Text(_formatTime(_etaSeconds), style: const TextStyle(color: Color(0xFFE71C23), fontWeight: FontWeight.w900, fontSize: 18)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const LinearProgressIndicator(
+            value: 0.3, // Static for demo, could be dynamic
+            backgroundColor: Colors.white,
+            color: Color(0xFF00ADB5),
+            minHeight: 6,
+            borderRadius: BorderRadius.all(Radius.circular(3)),
+          ),
+          const SizedBox(height: 12),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Dispatched", style: TextStyle(color: Color(0xFF00ADB5), fontWeight: FontWeight.w800, fontSize: 11)),
+              Text("Stay in a public place", style: TextStyle(color: Color(0xFF8E8E93), fontWeight: FontWeight.w600, fontSize: 11)),
+            ],
+          ),
+        ],
       ),
     );
   }

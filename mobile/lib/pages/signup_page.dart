@@ -21,7 +21,9 @@ class _SignupPageState extends State<SignupPage> {
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
+  final _healthCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
+  bool _consentAgreed = false;
   final List<TextEditingController> _contactCtrls = [
     TextEditingController(),
     TextEditingController(),
@@ -62,6 +64,11 @@ class _SignupPageState extends State<SignupPage> {
       return;
     }
 
+    if (!_consentAgreed) {
+      setState(() => _error = 'You must agree to the user consent & safety compliance');
+      return;
+    }
+
     setState(() { _loading = true; _error = null; });
     final res = await _api.sendOtp(phone);
     if (mounted) {
@@ -92,6 +99,8 @@ class _SignupPageState extends State<SignupPage> {
       city: _cityCtrl.text.trim(),
       emergencyContacts: contacts,
       otp: _otpCtrl.text.trim(),
+      healthConditions: _healthCtrl.text.trim(),
+      consentAgreed: _consentAgreed,
     );
 
     if (mounted) {
@@ -180,6 +189,27 @@ class _SignupPageState extends State<SignupPage> {
           child: _buildField(e.value, 'Contact ${e.key + 1}${e.key == 0 ? ' (Required)' : ''}',
               Icons.contact_emergency_outlined, TextInputType.phone),
         )),
+
+        const SizedBox(height: 32),
+        _sectionLabel('Health & Safety'),
+        const SizedBox(height: 16),
+        _buildField(_healthCtrl, 'Health Conditions (Optional)', Icons.medical_services_outlined),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Checkbox(
+              value: _consentAgreed,
+              activeColor: const Color(0xFF5D3891),
+              onChanged: (val) => setState(() => _consentAgreed = val ?? false),
+            ),
+            const Expanded(
+              child: Text(
+                'I agree to the user agreement & safety compliance terms.',
+                style: TextStyle(color: Color(0xFF1F1F1F), fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
 
         const SizedBox(height: 24),
         if (_error != null) _buildErrorBox(_error!),

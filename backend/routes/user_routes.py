@@ -106,10 +106,13 @@ def register():
         hashed_pw = hash_password(password) if password else hash_password(phone)
 
         # Insert user
+        health_conditions = data.get('health_conditions', '')
+        consent_agreed = data.get('consent_agreed', 0)
+        
         cursor.execute("""
-            INSERT INTO users (id, name, email, phone, password, city, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, name, email, phone, hashed_pw, city, datetime.now()))
+            INSERT INTO users (id, name, email, phone, password, city, health_conditions, consent_agreed, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, name, email, phone, hashed_pw, city, health_conditions, consent_agreed, datetime.now()))
 
         # Save session
         cursor.execute("""
@@ -208,6 +211,8 @@ def login():
                 'name': user_data['name'],
                 'phone': user_data['phone'],
                 'city': user_data.get('city', ''),
+                'health_conditions': user_data.get('health_conditions', ''),
+                'consent_agreed': user_data.get('consent_agreed', 0),
                 'emergency_contacts': contacts
             }
         }), 200

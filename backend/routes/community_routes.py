@@ -13,13 +13,23 @@ community_bp = Blueprint('community', __name__)
 
 @community_bp.route('/posts', methods=['GET'])
 def get_posts():
-    """Get all community posts, newest first."""
+    """Get community posts, with optional category filter."""
     try:
+        category = request.args.get('category')
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT * FROM community_posts ORDER BY created_at DESC LIMIT 50
-        """)
+        
+        if category:
+            cursor.execute("""
+                SELECT * FROM community_posts 
+                WHERE category = ? 
+                ORDER BY created_at DESC LIMIT 50
+            """, (category,))
+        else:
+            cursor.execute("""
+                SELECT * FROM community_posts ORDER BY created_at DESC LIMIT 50
+            """)
+            
         rows = cursor.fetchall()
         conn.close()
         posts = [dict(row) for row in rows]

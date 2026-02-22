@@ -11,6 +11,18 @@ import uuid
 
 chat_bp = Blueprint('chat', __name__)
 
+@chat_bp.route('/debug', methods=['GET'])
+def ai_debug():
+    from services import enhanced_ai_service
+    import os
+    return jsonify({
+        'imported_file': enhanced_ai_service.__file__,
+        'model_configured': enhanced_ai_service.model is not None,
+        'api_key_present': enhanced_ai_service.GEMINI_API_KEY is not None,
+        'model_name': str(enhanced_ai_service.model) if enhanced_ai_service.model else 'None',
+        'env_port': os.getenv('PORT', '5001')
+    })
+
 @chat_bp.route('/message', methods=['POST'])
 def send_message():
     """
@@ -18,16 +30,20 @@ def send_message():
     Request body: {
         "user_id": "string",
         "message": "string",
-        "conversation_id": "string" (optional),
-        "user_location": {"lat": float, "lng": float} (optional)
+        "conversation_id": "string",
+        "user_location": {"lat": float, "lng": float},
+        "image": "base64_string",
+        "voice": "base64_string"
     }
     """
     try:
         data = request.json
         user_id = data.get('user_id')
-        message = data.get('message')
+        message = data.get('message', '')
         conversation_id = data.get('conversation_id', str(uuid.uuid4()))
-        user_location = data.get('user_location')  # NEW: Get user location
+        user_location = data.get('user_location')
+        image_data = data.get('image')
+        voice_data = data.get('voice')
         
         # Save user message
         conn = get_db_connection()
@@ -38,8 +54,14 @@ def send_message():
         """, (str(uuid.uuid4()), conversation_id, user_id, message, 'user', datetime.now()))
         conn.commit()
         
-        # Get AI response with location context
-        ai_response = get_ai_response(message, conversation_id, user_location)
+        # Get AI response with multimodal context
+        ai_response = get_ai_response(
+            message, 
+            conversation_id, 
+            user_location,
+            image_data=image_data,
+            voice_data=voice_data
+        )
         
         # Save AI response
         cursor.execute("""
@@ -57,6 +79,7 @@ def send_message():
         }), 200
         
     except Exception as e:
+        print(f"Chat Route Error: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

@@ -7,7 +7,9 @@ import 'pages/hotels_page.dart';
 import 'pages/map_page.dart';
 import 'pages/community_page.dart';
 import 'pages/login_page.dart';
+import 'pages/permissions_page.dart';
 import 'services/auth_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() {
   runApp(const SafeHerApp());
@@ -62,6 +64,7 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   bool _checking = true;
   bool _loggedIn = false;
+  bool _permissionsNeeded = true;
 
   @override
   void initState() {
@@ -71,9 +74,17 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _checkAuth() async {
     final loggedIn = await AuthService.isLoggedIn();
+    bool permissionsNeeded = true;
+    
+    if (loggedIn) {
+      final status = await Geolocator.checkPermission();
+      permissionsNeeded = status == LocationPermission.denied || status == LocationPermission.deniedForever;
+    }
+
     if (mounted) {
       setState(() {
         _loggedIn = loggedIn;
+        _permissionsNeeded = permissionsNeeded;
         _checking = false;
       });
     }
@@ -108,7 +119,18 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (!_loggedIn) {
-      return LoginPage(onLoginSuccess: _onLoginSuccess);
+      return LoginPage(onLoginSuccess: () {
+        setState(() {
+          _loggedIn = true;
+          _permissionsNeeded = true;
+        });
+      });
+    }
+
+    if (_permissionsNeeded) {
+      return PermissionsPage(onComplete: () {
+        setState(() => _permissionsNeeded = false);
+      });
     }
 
     return MainShell(onLogout: _onLogout);
