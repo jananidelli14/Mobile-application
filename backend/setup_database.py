@@ -23,6 +23,9 @@ def create_tables():
             email TEXT UNIQUE NOT NULL,
             phone TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
+            city TEXT,
+            health_conditions TEXT,
+            consent_agreed INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)

@@ -2,9 +2,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
+  // ℹ️ BASE URL CONFIGURATION
+  // - For Localhost (iOS Simulator): 'http://localhost:5000/api'
+  // - For Android Emulator: 'http://10.0.2.2:5000/api'
+  // - For Physical Device: Change to your computer's local IP (e.g., 'http://192.168.1.XX:5000/api')
   static const String baseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://localhost:5000/api',
+    defaultValue: 'http://localhost:5000/api', // Update this to your local IP for external devices
   );
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
