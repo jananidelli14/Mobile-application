@@ -117,6 +117,7 @@ class _HotelsPageState extends State<HotelsPage> {
   Widget _buildHotelCard(dynamic hotel) {
     final rating = hotel['rating'] ?? hotel['safety_rating'] ?? 0.0;
     final ratingNum = rating is num ? rating.toDouble() : 0.0;
+    final distance = hotel['distance_km'];
     final priceLevel = hotel['price_level'] ?? 2;
     final priceSigns = '\$' * (priceLevel is int ? priceLevel.clamp(1, 4) : 2);
 
@@ -142,17 +143,18 @@ class _HotelsPageState extends State<HotelsPage> {
                   children: [
                     Expanded(child: Text(hotel['name'] ?? 'Hotel', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1F1F1F), letterSpacing: -0.5))),
                     const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: const Color(0xFFF9A826).withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star_rounded, size: 16, color: Color(0xFFF9A826)),
-                          const SizedBox(width: 4),
-                          Text(ratingNum.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFF9A826), fontSize: 13)),
-                        ],
+                    if (ratingNum > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(color: const Color(0xFFF9A826).withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.star_rounded, size: 16, color: Color(0xFFF9A826)),
+                            const SizedBox(width: 4),
+                            Text(ratingNum.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFF9A826), fontSize: 13)),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -164,7 +166,18 @@ class _HotelsPageState extends State<HotelsPage> {
                         style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontWeight: FontWeight.w500))),
                   ],
                 ),
-                const SizedBox(height: 20),
+                if (distance != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.directions_walk_rounded, size: 14, color: Color(0xFF00ADB5)),
+                        const SizedBox(width: 4),
+                        Text("${distance} km away", style: const TextStyle(color: Color(0xFF00ADB5), fontSize: 12, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Container(

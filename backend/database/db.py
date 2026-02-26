@@ -10,8 +10,9 @@ DATABASE_PATH = 'safeher_travel.db'
 
 def get_db_connection():
     """Get database connection"""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=20)
     conn.row_factory = sqlite3.Row
+    conn.execute('pragma journal_mode=wal')
     return conn
 
 def init_database():

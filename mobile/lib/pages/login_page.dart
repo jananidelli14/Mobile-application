@@ -13,16 +13,11 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
-  final _phoneCtrl = TextEditingController();
-  final _otpCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   
-  bool _isOtpMode = true;
-  bool _otpSent = false;
   bool _loading = false;
   String? _error;
-  String? _demoOtp;
   
   late AnimationController _animController;
   late Animation<double> _fadeIn;
@@ -38,50 +33,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _animController.dispose();
-    _phoneCtrl.dispose();
-    _otpCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _sendOtp() async {
-    if (_phoneCtrl.text.trim().length < 10) {
-      setState(() => _error = 'Enter a valid 10-digit phone number');
+  Future<void> _login() async {
+    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
+      setState(() { _error = 'Enter email and password'; });
       return;
     }
-    setState(() { _loading = true; _error = null; });
-    final res = await _api.sendOtp(_phoneCtrl.text.trim());
-    if (mounted) {
-      setState(() {
-        _loading = false;
-        if (res['success'] == true) {
-          _otpSent = true;
-          _demoOtp = res['demo_otp']?.toString();
-        } else {
-          _error = res['error'] ?? 'Failed to send OTP';
-        }
-      });
-    }
-  }
 
-  Future<void> _login() async {
     setState(() { _loading = true; _error = null; });
     
-    Map<String, dynamic> res;
-    if (_isOtpMode) {
-      if (_otpCtrl.text.trim().length != 6) {
-        setState(() { _loading = false; _error = 'Enter 6-digit OTP'; });
-        return;
-      }
-      res = await _api.login(phone: _phoneCtrl.text.trim(), otp: _otpCtrl.text.trim());
-    } else {
-      if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
-        setState(() { _loading = false; _error = 'Enter email and password'; });
-        return;
-      }
-      res = await _api.loginWithEmail(email: _emailCtrl.text.trim(), password: _passCtrl.text);
-    }
+    final res = await _api.loginWithEmail(
+      email: _emailCtrl.text.trim(), 
+      password: _passCtrl.text
+    );
 
     if (mounted) {
       setState(() => _loading = false);
@@ -126,59 +94,19 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     style: TextStyle(color: Color(0xFF666666), fontSize: 14)),
                 const SizedBox(height: 48),
 
-                // Mode Toggle
-                Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildToggleButton(label: 'OTP Login', active: _isOtpMode, onTap: () => setState(() { _isOtpMode = true; _error = null; })),
-                      _buildToggleButton(label: 'Email Login', active: !_isOtpMode, onTap: () => setState(() { _isOtpMode = false; _error = null; })),
-                    ],
-                  ),
+                _buildField(
+                  controller: _emailCtrl,
+                  label: 'Email Address',
+                  icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
                 ),
-                const SizedBox(height: 32),
-
-                if (_isOtpMode) ...[
-                  _buildField(
-                    controller: _phoneCtrl,
-                    label: 'Phone Number',
-                    icon: Icons.phone_android_rounded,
-                    keyboardType: TextInputType.phone,
-                    enabled: !_otpSent,
-                  ),
-                  if (_otpSent) ...[
-                    const SizedBox(height: 16),
-                    _buildField(
-                      controller: _otpCtrl,
-                      label: 'Enter 6-digit OTP',
-                      icon: Icons.lock_outline_rounded,
-                      keyboardType: TextInputType.number,
-                    ),
-                    if (_demoOtp != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Text('Demo OTP: $_demoOtp', textAlign: TextAlign.center, style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13)),
-                      ),
-                  ],
-                ] else ...[
-                  _buildField(
-                    controller: _emailCtrl,
-                    label: 'Email Address',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildField(
-                    controller: _passCtrl,
-                    label: 'Password',
-                    icon: Icons.lock_outline_rounded,
-                    isPassword: true,
-                  ),
-                ],
+                const SizedBox(height: 16),
+                _buildField(
+                  controller: _passCtrl,
+                  label: 'Password',
+                  icon: Icons.lock_outline_rounded,
+                  isPassword: true,
+                ),
                 
                 const SizedBox(height: 24),
                 if (_error != null)
@@ -188,15 +116,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   ),
 
                 _buildPrimaryButton(
-                  label: _loading ? 'Please wait...' : (_isOtpMode && !_otpSent ? 'Send OTP' : 'Login'),
-                  onTap: _loading ? null : (_isOtpMode && !_otpSent ? _sendOtp : _login),
+                  label: _loading ? 'Please wait...' : 'Login',
+                  onTap: _loading ? null : _login,
                 ),
-
-                if (_isOtpMode && _otpSent)
-                  TextButton(
-                    onPressed: () => setState(() { _otpSent = false; _otpCtrl.clear(); }),
-                    child: const Text('Change phone number', style: TextStyle(color: Color(0xFF5D3891), fontWeight: FontWeight.w600)),
-                  ),
 
                 const SizedBox(height: 40),
                 Row(
@@ -212,23 +134,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToggleButton({required String label, required bool active, required VoidCallback onTap}) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: active ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: active ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))] : null,
-          ),
-          alignment: Alignment.center,
-          child: Text(label, style: TextStyle(color: active ? const Color(0xFF5D3891) : const Color(0xFF8E8E93), fontWeight: active ? FontWeight.bold : FontWeight.normal, fontSize: 13)),
         ),
       ),
     );

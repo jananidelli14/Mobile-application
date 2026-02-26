@@ -1,25 +1,9 @@
-# Flask Framework
 Flask==3.0.0
 Flask-CORS==4.0.0
 Werkzeug==3.0.1
-
-# Google AI
-google-generativeai==0.3.2
-
-# HTTP Requests
+google-generativeai==0.4.0
 requests==2.31.0
-
-# Twilio for SMS
-twilio==8.10.0
-
-# SendGrid for Email
 sendgrid==6.11.0
-
-# Environment Variables
 python-dotenv==1.0.0
-
-# Date and Time
 python-dateutil==2.8.2
-
-# Additional utilities
-gunicorn==21.2.0  # For production deployment
+gunicorn==21.2.0

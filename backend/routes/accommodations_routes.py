@@ -22,8 +22,18 @@ def search_accommodations():
 
         hotels = search_pois_overpass(lat, lng, 'hotel', radius)
 
-        # Add a simple safety flag based on rating/stars
+        # Enhance hotel data: map stars to rating and ensure distance visibility
         for hotel in hotels:
+            # Map OSM stars to rating for UI consistency
+            if not hotel.get('rating') and hotel.get('stars'):
+                try:
+                    hotel['rating'] = float(hotel['stars'])
+                except:
+                    hotel['rating'] = 0.0
+            elif not hotel.get('rating'):
+                hotel['rating'] = 0.0
+
+            # Add a simple safety flag based on rating/stars
             stars = hotel.get('stars')
             if stars:
                 try:
@@ -31,13 +41,16 @@ def search_accommodations():
                 except:
                     hotel['safety_verified'] = False
             else:
-                hotel['safety_verified'] = None
+                # If rating is high, also verify
+                rating = hotel.get('rating', 0)
+                hotel['safety_verified'] = rating >= 3.0 if rating else None
 
         return jsonify({
             'success': True,
             'count': len(hotels),
             'accommodations': hotels,
-            'source': 'OpenStreetMap (live)'
+            'source': 'OpenStreetMap (live)',
+            'user_location': {'lat': lat, 'lng': lng}
         }), 200
 
     except (TypeError, ValueError):

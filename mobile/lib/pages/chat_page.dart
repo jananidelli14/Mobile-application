@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 import '../services/api_service.dart';
 import '../services/location_service.dart';
-import 'package:geolocator/geolocator.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -15,8 +24,14 @@ class _ChatPageState extends State<ChatPage> {
   final LocationService _locationService = LocationService();
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _picker = ImagePicker();
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  
   Position? _pos;
   String? _conversationId;
+  String? _selectedImageBase64;
+  String? _selectedVoiceBase64;
+  bool _isRecording = false;
 
   final List<Map<String, dynamic>> _messages = [
     {
@@ -31,17 +46,21 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     _getLocation();
   }
+  
+  @override
+  void dispose() {
+    _audioRecorder.dispose();
+    super.dispose();
+  }
 
   Future<void> _getLocation() async {
     final pos = await _locationService.getCurrentLocation();
     if (mounted) setState(() => _pos = pos);
   }
 
-  String? _selectedImageBase64;
-  String? _selectedVoiceBase64;
-
   void _sendMessage() async {
     if ((_controller.text.trim().isEmpty && _selectedImageBase64 == null && _selectedVoiceBase64 == null) || _isLoading) return;
+    
     final userMsg = _controller.text.trim();
     final image = _selectedImageBase64;
     final voice = _selectedVoiceBase64;
@@ -51,6 +70,7 @@ class _ChatPageState extends State<ChatPage> {
         'role': 'user', 
         'text': voice != null ? "🎤 Voice Message: $userMsg" : (image != null ? "📸 Image Message: $userMsg" : userMsg),
         'hasImage': image != null,
+        'image': image,
       });
       _isLoading = true;
       _selectedImageBase64 = null;
@@ -67,7 +87,7 @@ class _ChatPageState extends State<ChatPage> {
       imageBase64: image,
       voiceBase64: voice,
     );
-/* ... rest of the method logic unchanged ... */
+
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -76,25 +96,54 @@ class _ChatPageState extends State<ChatPage> {
           'role': 'assistant',
           'text': response['success'] == true
               ? (response['response'] ?? "I'm having trouble responding. Call 112 for emergencies.")
-              : "Connection issue. For emergencies: Call 100 (Police) or 112.",
+              : (response['error']?.toString().contains("429") == true 
+                  ? "I'm experiencing high traffic. For your safety: stay in well-lit areas. If in danger, call 100 or 112 immediately." 
+                  : "Connection issue. For emergencies: Call 100 (Police) or 112."),
         });
       });
       _scrollToBottom();
     }
   }
 
-  void _mockImageSelection() {
-    setState(() {
-      _selectedImageBase64 = "base64_image_data";
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("📸 Image attached (Mocked)")));
-    });
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _selectedImageBase64 = base64Encode(bytes);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("📸 Photo captured! Tap send to analyze.")));
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
   }
 
-  void _mockVoiceRecording() {
-    setState(() {
-      _selectedVoiceBase64 = "base64_voice_data";
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🎤 Voice recorded (Mocked)")));
-    });
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      final path = await _audioRecorder.stop();
+      setState(() => _isRecording = false);
+      if (path != null) {
+        final bytes = await File(path).readAsBytes();
+        setState(() {
+          _selectedVoiceBase64 = base64Encode(bytes);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🎤 Voice recorded! Tap send.")));
+        });
+      }
+    } else {
+      if (await _audioRecorder.hasPermission()) {
+        final dir = await getTemporaryDirectory();
+        final path = '${dir.path}/temp_record.m4a';
+        
+        const config = RecordConfig();
+        await _audioRecorder.start(config, path: path);
+        setState(() => _isRecording = true);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🎤 Recording... Tap again to stop.")));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Microphone permission denied")));
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -250,12 +299,15 @@ class _ChatPageState extends State<ChatPage> {
       child: Row(
         children: [
           IconButton(
-            onPressed: _mockImageSelection,
+            onPressed: _pickImage,
             icon: Icon(Icons.camera_alt_rounded, color: _selectedImageBase64 != null ? const Color(0xFF00ADB5) : const Color(0xFF8E8E93)),
           ),
           IconButton(
-            onPressed: _mockVoiceRecording,
-            icon: Icon(Icons.mic_rounded, color: _selectedVoiceBase64 != null ? const Color(0xFFE71C23) : const Color(0xFF8E8E93)),
+            onPressed: _toggleRecording,
+            icon: Icon(
+              _isRecording ? Icons.stop_circle_rounded : Icons.mic_rounded, 
+              color: _isRecording ? Colors.red : (_selectedVoiceBase64 != null ? const Color(0xFFE71C23) : const Color(0xFF8E8E93))
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(

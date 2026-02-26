@@ -207,11 +207,11 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_ENV', 'development') == 'development'
     
     print("\n" + "="*50)
-    print("🚀 Safe Her Travel API Server")
+    print("Safe Her Travel API Server")
     print("="*50)
-    print(f"📍 Running on: http://localhost:{port}")
-    print(f"🔧 Debug mode: {debug}")
-    print(f"🗄️ Database: {app.config['DATABASE']}")
+    print(f"Running on: http://localhost:{port}")
+    print(f"Debug mode: {debug}")
+    print(f"Database: {app.config['DATABASE']}")
     print("="*50 + "\n")
     
     app.run(

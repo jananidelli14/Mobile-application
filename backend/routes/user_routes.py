@@ -1,111 +1,59 @@
 """
-User Routes - Enhanced with phone+OTP based authentication
+User Routes - Email/Password based authentication
 """
 
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from database.db import get_db_connection
 import uuid
-import random
 import hashlib
 
 user_bp = Blueprint('user', __name__)
 
-# In-memory OTP store (use Redis in production)
-_otp_store = {}
-
-
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
-
-def generate_otp() -> str:
-    return str(random.randint(100000, 999999))
-
-
 # ─── Registration ─────────────────────────────────────────────────────────────
-
-@user_bp.route('/send-otp', methods=['POST'])
-def send_otp():
-    """
-    Step 1 of sign-up: send OTP to phone number.
-    Body: { "phone": "9876543210" }
-    OTP is printed to server console (for demo; replace with Twilio in production).
-    """
-    try:
-        data = request.json
-        phone = data.get('phone', '').strip()
-        if len(phone) < 10:
-            return jsonify({'success': False, 'error': 'Valid phone number required'}), 400
-
-        otp = generate_otp()
-        _otp_store[phone] = {'otp': otp, 'created_at': datetime.now()}
-
-        print(f"\n{'='*40}")
-        print(f"📱 OTP for {phone}: {otp}")
-        print(f"{'='*40}\n")
-
-        return jsonify({
-            'success': True,
-            'message': f'OTP sent to {phone}. Check backend console.',
-            'demo_otp': otp  # Include in response for demo convenience
-        }), 200
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
 
 @user_bp.route('/register', methods=['POST'])
 def register():
     """
-    Step 2 of sign-up: register with verified OTP.
+    Register a new user.
     Body: {
         "name": "string",
+        "email": "string",
+        "password": "string",
         "phone": "string",
         "city": "string",
-        "emergency_contacts": ["9999999999", "8888888888"],
-        "otp": "123456",
-        "password": "string" (optional, OTP-based auth)
+        "emergency_contacts": ["9999999999", "8888888888"]
     }
     """
     try:
         data = request.json
-        phone = data.get('phone', '').strip()
-        otp = data.get('otp', '').strip()
         name = data.get('name', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        phone = data.get('phone', '').strip()
         city = data.get('city', '').strip()
         emergency_contacts = data.get('emergency_contacts', [])
 
-        if not phone or not otp or not name:
-            return jsonify({'success': False, 'error': 'Name, phone and OTP are required'}), 400
-
-        # Verify OTP
-        stored = _otp_store.get(phone)
-        if not stored or stored['otp'] != otp:
-            return jsonify({'success': False, 'error': 'Invalid or expired OTP. Please request a new one.'}), 400
-
-        # Clear used OTP
-        del _otp_store[phone]
+        if not email or not password or not name:
+            return jsonify({'success': False, 'error': 'Name, email and password are required'}), 400
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
         # Check for existing user
-        cursor.execute("SELECT id FROM users WHERE phone = ? OR email = ?", (phone, data.get('email')))
+        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
         existing = cursor.fetchone()
         if existing:
             conn.close()
-            return jsonify({'success': False, 'error': 'Phone number or email already registered. Please login.'}), 409
+            return jsonify({'success': False, 'error': 'Email already registered. Please login.'}), 409
 
         user_id = str(uuid.uuid4())
         token = str(uuid.uuid4())
+        hashed_pw = hash_password(password)
 
-        # Email and password handling
-        email = data.get('email', phone + '@safeher.app').strip()
-        password = data.get('password')
-        hashed_pw = hash_password(password) if password else hash_password(phone)
-
-        # Insert user
         health_conditions = data.get('health_conditions', '')
         consent_agreed = data.get('consent_agreed', 0)
         
@@ -135,7 +83,7 @@ def register():
             'success': True,
             'user_id': user_id,
             'token': token,
-            'user': {'id': user_id, 'name': name, 'phone': phone, 'city': city}
+            'user': {'id': user_id, 'name': name, 'email': email, 'phone': phone, 'city': city}
         }), 201
 
     except Exception as e:
@@ -145,49 +93,27 @@ def register():
 @user_bp.route('/login', methods=['POST'])
 def login():
     """
-    Login with phone + OTP.
-    Step 1: POST /api/user/send-otp with phone
-    Step 2: POST /api/user/login with phone + otp
+    Login with Email and Password.
+    Body: {"email": "...", "password": "..."}
     """
     try:
         data = request.json
-        phone = data.get('phone', '').strip()
-        otp = data.get('otp', '').strip()
-        email = data.get('email', '').strip()
-        password = data.get('password', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+
+        if not email or not password:
+            return jsonify({'success': False, 'error': 'Email and password required'}), 400
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        user = None
 
-        # 1. Try Email/Password login
-        if email and password:
-            cursor.execute("SELECT * FROM users WHERE email = ? AND password = ?", (email, hash_password(password)))
-            user = cursor.fetchone()
-            if not user:
-                conn.close()
-                return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
+        cursor.execute("SELECT * FROM users WHERE email = ? AND password = ?", (email, hash_password(password)))
+        user = cursor.fetchone()
         
-        # 2. Try OTP login
-        elif phone and otp:
-            # Verify OTP
-            stored = _otp_store.get(phone)
-            if not stored or stored['otp'] != otp:
-                conn.close()
-                return jsonify({'success': False, 'error': 'Invalid OTP. Please request a new one.'}), 400
-
-            del _otp_store[phone]
-            cursor.execute("SELECT * FROM users WHERE phone = ?", (phone,))
-            user = cursor.fetchone()
-            if not user:
-                conn.close()
-                return jsonify({'success': False, 'error': 'Account not found. Please sign up first.'}), 404
-        
-        else:
+        if not user:
             conn.close()
-            return jsonify({'success': False, 'error': 'Email+Password or Phone+OTP required'}), 400
+            return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
 
-        # Create new session token
         token = str(uuid.uuid4())
         cursor.execute("""
             INSERT OR REPLACE INTO user_sessions (id, user_id, token, created_at)
@@ -195,12 +121,10 @@ def login():
         """, (str(uuid.uuid4()), user['id'], token, datetime.now()))
         conn.commit()
 
-        # Get emergency contacts
         cursor.execute("SELECT phone FROM emergency_contacts WHERE user_id = ?", (user['id'],))
         contacts = [row['phone'] for row in cursor.fetchall()]
         conn.close()
 
-        # Get user details
         user_data = dict(user)
         
         return jsonify({
@@ -209,7 +133,8 @@ def login():
             'user': {
                 'id': user_data['id'],
                 'name': user_data['name'],
-                'phone': user_data['phone'],
+                'email': user_data['email'],
+                'phone': user_data.get('phone', ''),
                 'city': user_data.get('city', ''),
                 'health_conditions': user_data.get('health_conditions', ''),
                 'consent_agreed': user_data.get('consent_agreed', 0),
@@ -227,7 +152,7 @@ def get_profile(user_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, phone, city, created_at FROM users WHERE id = ?", (user_id,))
+        cursor.execute("SELECT id, name, email, phone, city, created_at FROM users WHERE id = ?", (user_id,))
         user = cursor.fetchone()
 
         cursor.execute("SELECT phone FROM emergency_contacts WHERE user_id = ?", (user_id,))

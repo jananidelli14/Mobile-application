@@ -194,19 +194,32 @@ class _ResourcesPageState extends State<ResourcesPage> {
           const SizedBox(height: 16),
           const Divider(height: 1),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFF8E8E93)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  station['address'] ?? 'Tamil Nadu, India',
-                  style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
+            Row(
+              children: [
+                const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFF8E8E93)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    station['address'] ?? 'Tamil Nadu, India',
+                    style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
+                  ),
                 ),
+              ],
+            ),
+            if (station['phone'] != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.phone_rounded, size: 14, color: Color(0xFF00ADB5)),
+                  const SizedBox(width: 8),
+                  Text(
+                    station['phone'],
+                    style: const TextStyle(color: Color(0xFF00ADB5), fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ],
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
           Row(
             children: [
               Expanded(

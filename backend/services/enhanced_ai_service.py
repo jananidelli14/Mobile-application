@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 
-# Load environment variables explicitly from parent directory if needed
+# Load environment variables
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 load_dotenv(dotenv_path=env_path)
 
@@ -45,16 +45,16 @@ try:
             available_names = [m.name for m in model_list]
             print(f"[AI SERVICE] Supported models: {available_names}")
         except Exception as e:
-            print(f"[AI SERVICE] ⚠️ Could not list models: {e}. Proceeding with default list.")
+            print(f"[AI SERVICE]  Could not list models: {e}. Proceeding with default list.")
             
         # Force use of gemini-2.0-flash
         selected_model = 'models/gemini-2.0-flash'
-        print(f"[AI SERVICE] 🚀 Final Selection Force-Set: {selected_model}")
+        print(f"[AI SERVICE]  Final Selection Force-Set: {selected_model}")
         model = genai.GenerativeModel(selected_model)
     else:
-        print("[AI SERVICE] ❌ ERROR: GEMINI_API_KEY is missing!")
+        print("[AI SERVICE]  ERROR: GEMINI_API_KEY is missing!")
 except Exception as e:
-    print(f"[AI SERVICE] ❌ CRITICAL CONFIG ERROR: {e}")
+    print(f"[AI SERVICE]  CRITICAL CONFIG ERROR: {e}")
 
 # Database path
 DATABASE_PATH = 'safeher_travel.db'
@@ -111,11 +111,11 @@ def get_real_time_context(user_location: Optional[Dict] = None, place_name: Opti
         total_emergency = len(police) + len(hospitals)
         
         if total_emergency == 0:
-            context_parts.append(" 🛑 SAFETY WARNING: No police stations or hospitals found within 10km. This area is considered ISOLATED. Advise user to move to a populated area.")
+            context_parts.append("  SAFETY WARNING: No police stations or hospitals found within 10km. This area is considered ISOLATED. Advise user to move to a populated area.")
         elif total_emergency < 5:
-            context_parts.append(f" ⚠️ CAUTION: Limited emergency services nearby ({total_emergency} resources within 10km).")
+            context_parts.append(f"  CAUTION: Limited emergency services nearby ({total_emergency} resources within 10km).")
         else:
-            context_parts.append(f" ✅ SAFETY STATUS: Good coverage. {len(police)} police and {len(hospitals)} hospitals within 10km.")
+            context_parts.append(f"  SAFETY STATUS: Good coverage. {len(police)} police and {len(hospitals)} hospitals within 10km.")
         
         if police:
             context_parts.append("\nNearest Police Stations:")
@@ -185,8 +185,14 @@ def get_ai_response(user_message: str, conversation_id: str,
         response = chat.send_message(content_parts)
         return response.text
     except Exception as e:
-        print(f"AI Service Error during response generation: {e}")
-        return f"AI_ERROR: {str(e)}"
+        error_msg = str(e)
+        print(f"AI Service Error during response generation: {error_msg}")
+        
+        # Handle Quota Exceeded (429) gracefully
+        if "429" in error_msg or "quota" in error_msg.lower() or "limit" in error_msg.lower():
+            return get_intelligent_fallback_response(user_message, user_location)
+            
+        return f"AI_ERROR: {error_msg}"
 
 def get_intelligent_fallback_response(message: str, user_location: Optional[Dict] = None) -> str:
     message_lower = message.lower()
